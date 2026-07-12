@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PinHeaderClip Configurator</title>
+<style>
+  :root {
+    --bg:#0f1216; --panel:#171b21; --panel2:#1e242c; --line:#2b333d;
+    --text:#e6e9ee; --muted:#9aa4b2; --accent:#4f9dff; --accent2:#2f6fd0;
+  }
+  * { box-sizing:border-box; }
+  html,body { margin:0; height:100%; background:var(--bg); color:var(--text);
+    font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif; }
+  #app { display:flex; height:100%; }
+  #view { position:relative; flex:1 1 auto; min-width:0; }
+  #view canvas { display:block; width:100%; height:100%; }
+  #hint { position:absolute; left:12px; bottom:10px; color:var(--muted);
+    font-size:12px; pointer-events:none; opacity:.8; }
+  #panel { flex:0 0 320px; background:var(--panel); border-left:1px solid var(--line);
+    padding:20px; overflow-y:auto; }
+  h1 { font-size:17px; margin:0 0 2px; letter-spacing:.2px; }
+  .sub { color:var(--muted); font-size:12px; margin:0 0 18px; line-height:1.5; }
+  .field { margin:0 0 16px; }
+  label { display:block; font-size:13px; margin-bottom:6px; color:var(--text); }
+  .row { display:flex; align-items:center; gap:10px; }
+  input[type=range] { flex:1; accent-color:var(--accent); }
+  input[type=number], select {
+    width:100%; background:var(--panel2); color:var(--text);
+    border:1px solid var(--line); border-radius:8px; padding:8px 10px; font-size:14px; }
+  input[type=number].mini { width:72px; text-align:right; }
+  .val { font-variant-numeric:tabular-nums; color:var(--muted); font-size:12px; min-width:56px; text-align:right; }
+  .check { display:flex; align-items:center; gap:8px; }
+  .check input { width:16px; height:16px; accent-color:var(--accent); }
+  .divider { height:1px; background:var(--line); margin:18px 0; }
+  .adv summary { cursor:pointer; color:var(--muted); font-size:12px; margin-bottom:12px; }
+  .dims { background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    padding:12px 14px; font-size:13px; line-height:1.9; }
+  .dims b { color:var(--accent); font-variant-numeric:tabular-nums; }
+  button { width:100%; border:0; border-radius:10px; padding:12px 14px; font-size:14px;
+    font-weight:600; cursor:pointer; background:var(--accent); color:#04122b; margin-top:16px; }
+  button:hover { background:#6aacff; }
+  button.ghost { background:var(--panel2); color:var(--text); border:1px solid var(--line);
+    font-weight:500; margin-top:8px; }
+  button.ghost:hover { border-color:var(--accent); }
+  .src { color:var(--muted); font-size:11px; display:inline-block; margin-top:14px; line-height:1.5; }
+  .src code { background:var(--panel2); border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+  @media (max-width:760px){
+    #app{ flex-direction:column-reverse; }
+    #panel{ flex:0 0 auto; border-left:0; border-top:1px solid var(--line); }
+    #view{ height:52vh; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="view"><div id="hint">Drag = rotate · Scroll = zoom · Right-drag = pan</div></div>
+  <div id="panel">
+    <h1>PinHeaderClip Configurator</h1>
+    <p class="sub">A clip for the 2.54&nbsp;mm (0.1&Prime;) pin-header grid. Set the channel count and length, then export an STL.</p>
+
+    <div class="field">
+      <label for="count">Number of channels</label>
+      <div class="row">
+        <input type="range" id="count" min="1" max="20" step="1" value="4">
+        <input type="number" id="countN" class="mini" min="1" max="40" step="1" value="4">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="span">Length between the feet (mm)</label>
+      <div class="row">
+        <input type="range" id="span" min="2" max="60" step="0.1" value="17.8">
+        <input type="number" id="spanN" class="mini" min="0.5" max="200" step="0.1" value="17.8">
+      </div>
+    </div>
+
+    <details class="adv">
+      <summary>More options</summary>
+
+      <div class="field">
+        <label for="close">Close one foot (floor between the tines)</label>
+        <select id="close">
+          <option value="none">No</option>
+          <option value="start" selected>Yes</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label for="cap">Floor thickness (mm)</label>
+        <input type="number" id="cap" class="mini" min="0.1" max="2" step="0.05" value="0.4">
+      </div>
+
+      <div class="field check">
+        <input type="checkbox" id="equal" checked>
+        <label for="equal" style="margin:0">Pad outer tines to full width</label>
+      </div>
+    </details>
+
+    <div class="divider"></div>
+
+    <div class="dims" id="dims"></div>
+
+    <button id="dl">Download STL</button>
+    <button id="fit" class="ghost">Center view</button>
+    <button id="reset" class="ghost">Reset to defaults</button>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { STLExporter } from 'three/addons/exporters/STLExporter.js';
+
+// ---- fixed profile constants (from clipsingle.scad / the 3mf) ----------
+const HALF_W   = 1.27;      // half of the 2.54 mm width
+const Y_BOTTOM = -2.54;     // open mouth of the slot
+const Y_SLAB   = 0.15;      // underside of the top slab
+const Y_TOP    = 0.60;      // top surface
+const SLOT_R   = 0.75;      // channel radius
+const SLOT_CY  = -1.27;     // channel centre height
+const FOOT_LEN = 1.50;      // length of each end foot
+const PITCH    = 2 * HALF_W;        // 2.54 mm
+const WALL     = HALF_W - SLOT_R;   // 0.52 mm  (one channel side wall)
+const CURVE_SEG = 32;
+
+// Flip the part so the forks point UP and the base rests on y = 0.
+// (180 deg about Z = proper rotation, keeps face winding, then lift by Y_TOP.)
+const FLIP = new THREE.Matrix4()
+  .makeTranslation(0, Y_TOP, 0)
+  .multiply(new THREE.Matrix4().makeRotationZ(Math.PI));
+
+// ---- scene setup -------------------------------------------------------
+const viewEl = document.getElementById('view');
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+viewEl.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0f1216);
+
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 2000);
+camera.position.set(24, 16, 34);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+
+scene.add(new THREE.HemisphereLight(0xdfe8ff, 0x20262e, 1.0));
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(18, 30, 20); scene.add(key);
+const rim = new THREE.DirectionalLight(0x88aaff, 0.5);
+rim.position.set(-20, -6, -14); scene.add(rim);
+
+const grid = new THREE.GridHelper(60, 30, 0x2b333d, 0x1c222a);
+grid.position.y = 0; scene.add(grid);
+
+const material = new THREE.MeshStandardMaterial({
+  color:0x9fb2c6, metalness:0.15, roughness:0.55, flatShading:false });
+
+let group = new THREE.Group();
+scene.add(group);
+
+// ---- geometry ----------------------------------------------------------
+function slotCenters(count, totalW) {
+  // channels stay on the 2.54 grid, centred on X = 0
+  const c = [];
+  for (let i = 0; i < count; i++) c.push((i - (count - 1) / 2) * PITCH);
+  return c;
+}
+
+// Open foot: full rectangle with a bottom-open, round-topped notch per channel.
+function openFootShape(count, totalW) {
+  const s = new THREE.Shape();
+  const L = -totalW / 2, R = totalW / 2;
+  const cs = slotCenters(count, totalW).slice().sort((a, b) => a - b);
+  s.moveTo(L, Y_BOTTOM);
+  for (const cx of cs) {
+    s.lineTo(cx - SLOT_R, Y_BOTTOM);
+    s.lineTo(cx - SLOT_R, SLOT_CY);
+    s.absarc(cx, SLOT_CY, SLOT_R, Math.PI, 0, true); // upper semicircle
+    s.lineTo(cx + SLOT_R, Y_BOTTOM);
+  }
+  s.lineTo(R, Y_BOTTOM);
+  s.lineTo(R, Y_TOP);
+  s.lineTo(L, Y_TOP);
+  s.lineTo(L, Y_BOTTOM);
+  return s;
+}
+
+// Closed foot: full rectangle with a closed rounded slot (hole) sitting on a
+// floor of cap thickness -> the mouth between the fork tines is bridged.
+function closedFootShape(count, totalW, cap) {
+  const s = new THREE.Shape();
+  const L = -totalW / 2, R = totalW / 2;
+  s.moveTo(L, Y_BOTTOM); s.lineTo(R, Y_BOTTOM);
+  s.lineTo(R, Y_TOP);    s.lineTo(L, Y_TOP); s.lineTo(L, Y_BOTTOM);
+  const slotBottom = Y_BOTTOM + cap;
+  for (const cx of slotCenters(count, totalW)) {
+    const h = new THREE.Path();
+    h.moveTo(cx - SLOT_R, slotBottom);
+    h.lineTo(cx - SLOT_R, SLOT_CY);
+    h.absarc(cx, SLOT_CY, SLOT_R, Math.PI, 0, true);
+    h.lineTo(cx + SLOT_R, slotBottom);
+    h.lineTo(cx - SLOT_R, slotBottom);
+    s.holes.push(h);
+  }
+  return s;
+}
+
+function footGeom(shape, zPos) {
+  const g = new THREE.ExtrudeGeometry(shape,
+    { depth: FOOT_LEN, bevelEnabled:false, steps:1, curveSegments:CURVE_SEG });
+  g.translate(0, 0, zPos);
+  return g;
+}
+
+function build(p) {
+  const stripW  = p.count * PITCH;
+  const totalW  = stripW + (p.equal ? 2 * WALL : 0);
+  const totalL  = p.span + 2 * FOOT_LEN;
+
+  // dispose old
+  group.children.forEach(m => m.geometry.dispose());
+  group.clear();
+
+  const geoms = [];
+
+  // top slab (full length), centred on Z
+  const slab = new THREE.BoxGeometry(totalW, Y_TOP - Y_SLAB, totalL);
+  slab.translate(0, (Y_SLAB + Y_TOP) / 2, 0);
+  geoms.push(slab);
+
+  // feet
+  const z0 = -totalL / 2, z1 = totalL / 2 - FOOT_LEN;
+  geoms.push(footGeom(
+    p.close === 'start' ? closedFootShape(p.count, totalW, p.cap) : openFootShape(p.count, totalW), z0));
+  geoms.push(footGeom(
+    p.close === 'end'   ? closedFootShape(p.count, totalW, p.cap) : openFootShape(p.count, totalW), z1));
+
+  // flip forks-up (base on y = 0) and add
+  for (const g of geoms) { g.applyMatrix4(FLIP); group.add(new THREE.Mesh(g, material)); }
+
+  updateDims(totalL, totalW, p.count);
+  return { totalW, totalL };
+}
+
+function updateDims(len, wid, count) {
+  document.getElementById('dims').innerHTML =
+    `Length: <b>${len.toFixed(2)}</b> mm<br>` +
+    `Width: <b>${wid.toFixed(2)}</b> mm<br>` +
+    `Height: <b>${(Y_TOP - Y_BOTTOM).toFixed(2)}</b> mm<br>` +
+    `Channels: <b>${count}</b> · pitch <b>2.54</b> mm`;
+}
+
+// ---- fit camera --------------------------------------------------------
+function fitView() {
+  const box = new THREE.Box3().setFromObject(group);
+  const size = box.getSize(new THREE.Vector3());
+  const center = box.getCenter(new THREE.Vector3());
+  const radius = 0.5 * Math.max(size.x, size.y, size.z);
+  const dist = radius / Math.sin((camera.fov * Math.PI / 180) / 2) * 1.5;
+  controls.target.copy(center);
+  const dir = new THREE.Vector3(0.7, 0.5, 1).normalize();
+  camera.position.copy(center).add(dir.multiplyScalar(dist));
+  camera.near = dist / 100; camera.far = dist * 100; camera.updateProjectionMatrix();
+  controls.update();
+}
+
+// ---- params from UI ----------------------------------------------------
+function readParams() {
+  return {
+    count: Math.max(1, parseInt(document.getElementById('countN').value) || 1),
+    span:  Math.max(0.5, parseFloat(document.getElementById('spanN').value) || 0.5),
+    close: document.getElementById('close').value,
+    cap:   Math.max(0.1, parseFloat(document.getElementById('cap').value) || 0.4),
+    equal: document.getElementById('equal').checked,
+  };
+}
+
+function rebuild(doFit) {
+  const p = readParams();
+  build(p);
+  if (doFit) fitView();
+}
+
+// link range <-> number pairs
+function pair(rangeId, numId, onChange) {
+  const r = document.getElementById(rangeId), n = document.getElementById(numId);
+  r.addEventListener('input', () => { n.value = r.value; onChange(); });
+  n.addEventListener('input', () => { r.value = n.value; onChange(); });
+}
+pair('count', 'countN', () => rebuild(false));
+pair('span', 'spanN', () => rebuild(false));
+['close', 'cap', 'equal'].forEach(id =>
+  document.getElementById(id).addEventListener('input', () => rebuild(false)));
+document.getElementById('fit').addEventListener('click', fitView);
+
+// ---- reset to defaults -------------------------------------------------
+const DEFAULTS = { count:4, span:17.8, close:'start', cap:0.4, equal:true };
+function resetDefaults() {
+  document.getElementById('count').value  = DEFAULTS.count;
+  document.getElementById('countN').value = DEFAULTS.count;
+  document.getElementById('span').value   = DEFAULTS.span;
+  document.getElementById('spanN').value  = DEFAULTS.span;
+  document.getElementById('close').value  = DEFAULTS.close;
+  document.getElementById('cap').value    = DEFAULTS.cap;
+  document.getElementById('equal').checked = DEFAULTS.equal;
+  rebuild(true);
+}
+document.getElementById('reset').addEventListener('click', resetDefaults);
+
+// ---- STL download ------------------------------------------------------
+document.getElementById('dl').addEventListener('click', () => {
+  const p = readParams();
+  const stl = new STLExporter().parse(group, { binary:true });
+  const blob = new Blob([stl], { type:'application/octet-stream' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `pinheaderclip_${p.count}x_${p.span.toFixed(1)}mm.stl`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+});
+
+// ---- resize / loop -----------------------------------------------------
+function resize() {
+  const w = viewEl.clientWidth, h = viewEl.clientHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+rebuild(true);
+resize(); fitView();
+(function loop() {
+  requestAnimationFrame(loop);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
