@@ -83,7 +83,13 @@
     </div>
 
     <div class="field">
-      <label for="span">Length between PCB bottom and Female Pin Header Top (mm)</label>
+      <div class="lbl">
+        <label for="span">Length between PCB bottom and Female Pin Header Top (mm)</label>
+        <span class="info" id="spanInfo" tabindex="0" role="button"
+              data-img="span-help.svg"
+              data-alt="Length is the distance from the PCB underside to the top of the female pin header"
+              aria-label="Show a diagram of what this length means">i</span>
+      </div>
       <div class="row">
         <input type="range" id="span" min="2" max="60" step="0.1" value="17.8">
         <input type="number" id="spanN" class="mini" min="0.5" max="200" step="0.1" value="17.8">
@@ -105,6 +111,8 @@
         <div class="lbl">
           <label for="offset">Offset - Distance from PCB edge to pin header (mm)</label>
           <span class="info" id="offsetInfo" tabindex="0" role="button"
+                data-img="offset-help.svg"
+                data-alt="Offset is the distance from the PCB board edge to the pin header"
                 aria-label="Show a diagram of what offset means">i</span>
         </div>
         <input type="number" id="offset" class="mini" min="0" max="30" step="0.1" value="0">
@@ -136,7 +144,7 @@
 </div>
 
 <div id="tip" role="tooltip">
-  <img src="offset-help.svg" alt="Offset is the distance from the PCB board edge to the pin header">
+  <img id="tipImg" src="" alt="">
 </div>
 
 <script type="importmap">
@@ -359,13 +367,20 @@ function resetDefaults() {
 }
 document.getElementById('reset').addEventListener('click', resetDefaults);
 
-// ---- info tooltip for "offset" ----------------------------------------
-const infoEl = document.getElementById('offsetInfo');
+// ---- info tooltip (shared by every .info icon) -------------------------
 const tipEl  = document.getElementById('tip');
+const tipImg = document.getElementById('tipImg');
+const infoEls = document.querySelectorAll('.info');
+let activeInfoEl = null;
 
-function showTip() {
+function showTip(el) {
+  activeInfoEl = el;
+  if (tipImg.getAttribute('src') !== el.dataset.img) {
+    tipImg.src = el.dataset.img;
+    tipImg.alt = el.dataset.alt || '';
+  }
   tipEl.classList.add('show');                 // must be visible to measure it
-  const r = infoEl.getBoundingClientRect();
+  const r = el.getBoundingClientRect();
   const t = tipEl.getBoundingClientRect();
   const M = 8;
   // prefer left of the icon (the panel sits on the right); fall back to right
@@ -377,22 +392,25 @@ function showTip() {
   tipEl.style.left = left + 'px';
   tipEl.style.top  = top + 'px';
 }
-function hideTip() { tipEl.classList.remove('show'); }
-function toggleTip() { tipEl.classList.contains('show') ? hideTip() : showTip(); }
+function hideTip() { tipEl.classList.remove('show'); activeInfoEl = null; }
+function toggleTip(el) { (tipEl.classList.contains('show') && activeInfoEl === el) ? hideTip() : showTip(el); }
 
-if (matchMedia('(hover: hover)').matches) {
-  // desktop: hover / keyboard focus
-  infoEl.addEventListener('mouseenter', showTip);
-  infoEl.addEventListener('mouseleave', hideTip);
-  infoEl.addEventListener('focus', showTip);
-  infoEl.addEventListener('blur', hideTip);
-} else {
-  // touch: tap toggles (no hover, and no focus-vs-click conflict)
-  infoEl.addEventListener('click', (e) => { e.preventDefault(); toggleTip(); });
-}
+const hoverCapable = matchMedia('(hover: hover)').matches;
+infoEls.forEach((el) => {
+  if (hoverCapable) {
+    // desktop: hover / keyboard focus
+    el.addEventListener('mouseenter', () => showTip(el));
+    el.addEventListener('mouseleave', hideTip);
+    el.addEventListener('focus', () => showTip(el));
+    el.addEventListener('blur', hideTip);
+  } else {
+    // touch: tap toggles (no hover, and no focus-vs-click conflict)
+    el.addEventListener('click', (e) => { e.preventDefault(); toggleTip(el); });
+  }
+});
 // dismiss on outside tap / scroll / resize
 document.addEventListener('click', (e) => {
-  if (!infoEl.contains(e.target) && !tipEl.contains(e.target)) hideTip();
+  if (!(activeInfoEl && activeInfoEl.contains(e.target)) && !tipEl.contains(e.target)) hideTip();
 });
 document.getElementById('panel').addEventListener('scroll', hideTip);
 window.addEventListener('resize', hideTip);

@@ -1,0 +1,70 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 380 420" width="380" height="420"
+     font-family="system-ui, -apple-system, Segoe UI, Roboto, sans-serif" role="img"
+     aria-label="Length is the distance from the PCB underside to the top of the female pin header">
+  <defs>
+    <marker id="ah2" markerUnits="userSpaceOnUse" markerWidth="16" markerHeight="15"
+            refX="16" refY="7.5" orient="auto-start-reverse">
+      <path d="M0,0 L16,7.5 L0,15 Z" fill="#ffffff" stroke="#0a0a0a" stroke-width="1.4" stroke-linejoin="round"/>
+    </marker>
+  </defs>
+
+  <!-- background -->
+  <rect width="380" height="420" fill="#141414"/>
+
+  <!-- pins: one continuous run from inside the female header, through the
+       male header's base, through the PCB, down to the exposed solder leads -->
+  <g fill="#c9ced3" stroke="#4a4f54" stroke-width="1.5">
+    <rect x="156" y="100" width="8" height="210"/>
+    <rect x="186" y="100" width="8" height="210"/>
+    <rect x="216" y="100" width="8" height="210"/>
+  </g>
+
+  <!-- female pin-header body (plugs onto the male header's pins) -->
+  <rect x="138" y="90" width="104" height="146" rx="6" fill="#202225" stroke="#000000" stroke-width="2"/>
+  <!-- crimp/latch detail -->
+  <rect x="150" y="98" width="80" height="10" rx="2" fill="#2c2f33"/>
+
+  <!-- wires exiting the top -->
+  <line x1="160" y1="94" x2="160" y2="45" stroke="#e8c400" stroke-width="7" stroke-linecap="round"/>
+  <line x1="190" y1="94" x2="190" y2="40" stroke="#eeeeee" stroke-width="7" stroke-linecap="round"/>
+  <line x1="220" y1="94" x2="220" y2="45" stroke="#2f6fd0" stroke-width="7" stroke-linecap="round"/>
+
+  <!-- male pin-header base: the plastic strip soldered flush to the PCB
+       that holds the pins at pitch (this is what was missing) - a shade
+       lighter than the female shroud above it, and a bit wider so it
+       reads as its own part instead of the header's shadow -->
+  <rect x="125" y="234" width="130" height="18" rx="2" fill="#7a7f86" stroke="#2c2e32" stroke-width="1.5"/>
+
+  <!-- PCB slab -->
+  <rect x="20" y="250" width="340" height="28" fill="#1faa1f"/>
+  <!-- solder pads where the pins pass through -->
+  <g fill="#d4a017" stroke="#6b5210" stroke-width="1.5">
+    <circle cx="160" cy="250" r="7"/>
+    <circle cx="190" cy="250" r="7"/>
+    <circle cx="220" cy="250" r="7"/>
+  </g>
+
+  <!-- PCB underside (board bottom) edge -->
+  <line x1="20" y1="278" x2="360" y2="278" stroke="#0d0d0d" stroke-width="3"/>
+
+  <!-- dimension: header top down to PCB underside -->
+  <line x1="242" y1="90" x2="300" y2="90" stroke="#0a0a0a" stroke-width="5" stroke-linecap="round"/>
+  <line x1="242" y1="90" x2="300" y2="90" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+  <line x1="300" y1="278" x2="330" y2="278" stroke="#0a0a0a" stroke-width="5" stroke-linecap="round"/>
+  <line x1="300" y1="278" x2="330" y2="278" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round"/>
+
+  <line x1="300" y1="90" x2="300" y2="278" stroke="#0a0a0a" stroke-width="5.5"/>
+  <line x1="300" y1="90" x2="300" y2="278" stroke="#ffffff" stroke-width="2.5"
+        marker-start="url(#ah2)" marker-end="url(#ah2)"/>
+  <text x="308" y="188" fill="#ffffff" font-size="18" font-weight="800"
+        stroke="#0a0a0a" stroke-width="3.5" paint-order="stroke" stroke-linejoin="round">Length</text>
+
+  <!-- captions -->
+  <text x="20" y="340" fill="#ffffff" font-size="16" font-weight="600">
+    <tspan x="20" dy="0">Length = distance from the PCB underside</tspan>
+    <tspan x="20" dy="22">to the top of the female pin header</tspan>
+  </text>
+  <text x="20" y="390" fill="#9aa4b2" font-size="14">
+    Measure it on your assembled board and enter it in mm.
+  </text>
+</svg>
