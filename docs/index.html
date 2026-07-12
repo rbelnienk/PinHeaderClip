@@ -46,6 +46,20 @@
   button.ghost:hover { border-color:var(--accent); }
   .src { color:var(--muted); font-size:11px; display:inline-block; margin-top:14px; line-height:1.5; }
   .src code { background:var(--panel2); border:1px solid var(--line); border-radius:4px; padding:1px 5px; }
+  /* label + info icon */
+  .lbl { display:flex; align-items:flex-start; gap:6px; margin-bottom:6px; }
+  .lbl label { margin-bottom:0; }
+  .info { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center;
+    width:16px; height:16px; margin-top:1px; border-radius:50%; border:1px solid var(--line);
+    background:var(--panel2); color:var(--muted); font-size:11px; font-weight:700;
+    line-height:1; cursor:help; user-select:none; }
+  .info:hover, .info:focus { border-color:var(--accent); color:var(--accent); outline:none; }
+  /* tooltip: position:fixed so the panel's overflow:auto can't clip it */
+  #tip { position:fixed; z-index:50; display:none; width:min(460px, 92vw);
+    background:var(--panel2); border:1px solid var(--line); border-radius:10px;
+    padding:8px; box-shadow:0 12px 34px rgba(0,0,0,.55); }
+  #tip.show { display:block; }
+  #tip img { display:block; width:100%; height:auto; border-radius:6px; }
   @media (max-width:760px){
     #app{ flex-direction:column-reverse; }
     #panel{ flex:1 1 auto; min-height:0; border-left:0; border-top:1px solid var(--line); }
@@ -61,7 +75,7 @@
     <p class="sub">A clip for the 2.54&nbsp;mm (0.1&Prime;) pin-header grid. Set the channel count and length, then export an STL.</p>
 
     <div class="field">
-      <label for="count">Number of channels</label>
+      <label for="count">Number of Pins</label>
       <div class="row">
         <input type="range" id="count" min="1" max="20" step="1" value="4">
         <input type="number" id="countN" class="mini" min="1" max="40" step="1" value="4">
@@ -69,7 +83,7 @@
     </div>
 
     <div class="field">
-      <label for="span">Length between the feet (mm)</label>
+      <label for="span">Length between PCB bottom and Female Pin Header Top (mm)</label>
       <div class="row">
         <input type="range" id="span" min="2" max="60" step="0.1" value="17.8">
         <input type="number" id="spanN" class="mini" min="0.5" max="200" step="0.1" value="17.8">
@@ -80,7 +94,7 @@
       <summary>More options</summary>
 
       <div class="field">
-        <label for="rows">Pin-header rows (tine length)</label>
+        <label for="rows">Pin-header rows</label>
         <select id="rows">
           <option value="1" selected>1 row</option>
           <option value="2">2 rows (double-length tines)</option>
@@ -88,7 +102,11 @@
       </div>
 
       <div class="field">
-        <label for="offset">Extra tine length / offset (mm)</label>
+        <div class="lbl">
+          <label for="offset">Offset - Distance from PCB edge to pin header (mm)</label>
+          <span class="info" id="offsetInfo" tabindex="0" role="button"
+                aria-label="Show a diagram of what offset means">i</span>
+        </div>
         <input type="number" id="offset" class="mini" min="0" max="30" step="0.1" value="0">
       </div>
 
@@ -100,10 +118,6 @@
         </select>
       </div>
 
-      <div class="field">
-        <label for="cap">Floor thickness (mm)</label>
-        <input type="number" id="cap" class="mini" min="0.1" max="2" step="0.05" value="0.4">
-      </div>
 
       <div class="field check">
         <input type="checkbox" id="equal" checked>
@@ -119,6 +133,10 @@
     <button id="fit" class="ghost">Center view</button>
     <button id="reset" class="ghost">Reset to defaults</button>
   </div>
+</div>
+
+<div id="tip" role="tooltip">
+  <img src="offset-help.svg" alt="Offset is the distance from the PCB board edge to the pin header">
 </div>
 
 <script type="importmap">
@@ -301,7 +319,7 @@ function readParams() {
     rows:  Math.max(1, parseInt(document.getElementById('rows').value) || 1),
     offset: Math.max(0, parseFloat(document.getElementById('offset').value) || 0),
     close: document.getElementById('close').value,
-    cap:   Math.max(0.1, parseFloat(document.getElementById('cap').value) || 0.4),
+    cap:   Math.max(0.1, parseFloat(document.getElementById('cap')?.value) || 0.4),
     equal: document.getElementById('equal').checked,
   };
 }
@@ -321,7 +339,7 @@ function pair(rangeId, numId, onChange) {
 pair('count', 'countN', () => rebuild(false));
 pair('span', 'spanN', () => rebuild(false));
 ['rows', 'offset', 'close', 'cap', 'equal'].forEach(id =>
-  document.getElementById(id).addEventListener('input', () => rebuild(false)));
+  document.getElementById(id)?.addEventListener('input', () => rebuild(false)));
 document.getElementById('fit').addEventListener('click', fitView);
 
 // ---- reset to defaults -------------------------------------------------
@@ -334,11 +352,50 @@ function resetDefaults() {
   document.getElementById('rows').value   = DEFAULTS.rows;
   document.getElementById('offset').value = DEFAULTS.offset;
   document.getElementById('close').value  = DEFAULTS.close;
-  document.getElementById('cap').value    = DEFAULTS.cap;
+  const capEl = document.getElementById('cap');
+  if (capEl) capEl.value = DEFAULTS.cap;
   document.getElementById('equal').checked = DEFAULTS.equal;
   rebuild(true);
 }
 document.getElementById('reset').addEventListener('click', resetDefaults);
+
+// ---- info tooltip for "offset" ----------------------------------------
+const infoEl = document.getElementById('offsetInfo');
+const tipEl  = document.getElementById('tip');
+
+function showTip() {
+  tipEl.classList.add('show');                 // must be visible to measure it
+  const r = infoEl.getBoundingClientRect();
+  const t = tipEl.getBoundingClientRect();
+  const M = 8;
+  // prefer left of the icon (the panel sits on the right); fall back to right
+  let left = r.left - t.width - 10;
+  if (left < M) left = Math.min(r.right + 10, window.innerWidth - t.width - M);
+  left = Math.max(M, Math.min(left, window.innerWidth - t.width - M));
+  let top = r.top + r.height / 2 - t.height / 2;
+  top = Math.max(M, Math.min(top, window.innerHeight - t.height - M));
+  tipEl.style.left = left + 'px';
+  tipEl.style.top  = top + 'px';
+}
+function hideTip() { tipEl.classList.remove('show'); }
+function toggleTip() { tipEl.classList.contains('show') ? hideTip() : showTip(); }
+
+if (matchMedia('(hover: hover)').matches) {
+  // desktop: hover / keyboard focus
+  infoEl.addEventListener('mouseenter', showTip);
+  infoEl.addEventListener('mouseleave', hideTip);
+  infoEl.addEventListener('focus', showTip);
+  infoEl.addEventListener('blur', hideTip);
+} else {
+  // touch: tap toggles (no hover, and no focus-vs-click conflict)
+  infoEl.addEventListener('click', (e) => { e.preventDefault(); toggleTip(); });
+}
+// dismiss on outside tap / scroll / resize
+document.addEventListener('click', (e) => {
+  if (!infoEl.contains(e.target) && !tipEl.contains(e.target)) hideTip();
+});
+document.getElementById('panel').addEventListener('scroll', hideTip);
+window.addEventListener('resize', hideTip);
 
 // ---- STL download ------------------------------------------------------
 document.getElementById('dl').addEventListener('click', () => {
