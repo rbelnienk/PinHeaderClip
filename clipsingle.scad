@@ -14,7 +14,6 @@ $fn = 96;
 
 // ---- parameters (mm) --------------------------------------------------
 half_w    = 1.27;     // half of the 2.54 mm (0.1") width
-y_bottom  = -2.54;    // underside of the feet / open mouth of the slot
 y_slab    =  0.15;    // underside of the top slab
 y_top     =  0.60;    // top surface (flat over the whole length)
 
@@ -36,6 +35,11 @@ count = 1;                 // number of clips side-by-side. They share walls
 
 equal_end_tines = true;    // pad the two outer tines so they are as wide as
                            // the (doubled) shared tines in the middle.
+
+rows      = 1;             // pin-header rows to grip: 2 makes the tines twice
+                           // as deep (longer fork) for a stacked two-row header.
+tine_len  = slot_cy - (-2.54);            // straight tine/slot depth for one row (1.27)
+y_bottom  = slot_cy - rows * tine_len;    // open mouth of the slot; deeper for more rows
 
 pitch   = 2 * half_w;      // 2.54 mm  (channel pitch)
 wall    = half_w - slot_r; // one channel side-wall = half a middle tine (0.52)

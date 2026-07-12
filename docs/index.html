@@ -80,6 +80,14 @@
       <summary>More options</summary>
 
       <div class="field">
+        <label for="rows">Pin-header rows (tine length)</label>
+        <select id="rows">
+          <option value="1" selected>1 row</option>
+          <option value="2">2 rows (double-length tines)</option>
+        </select>
+      </div>
+
+      <div class="field">
         <label for="close">Close one foot (floor between the tines)</label>
         <select id="close">
           <option value="none">No</option>
@@ -123,15 +131,18 @@ import { STLExporter } from 'three/addons/exporters/STLExporter.js';
 
 // ---- fixed profile constants (from clipsingle.scad / the 3mf) ----------
 const HALF_W   = 1.27;      // half of the 2.54 mm width
-const Y_BOTTOM = -2.54;     // open mouth of the slot
 const Y_SLAB   = 0.15;      // underside of the top slab
 const Y_TOP    = 0.60;      // top surface
 const SLOT_R   = 0.75;      // channel radius
 const SLOT_CY  = -1.27;     // channel centre height
+const TINE_LEN = 1.27;      // straight tine/slot depth per row (SLOT_CY to one-row mouth -2.54)
 const FOOT_LEN = 1.50;      // length of each end foot
 const PITCH    = 2 * HALF_W;        // 2.54 mm
 const WALL     = HALF_W - SLOT_R;   // 0.52 mm  (one channel side wall)
 const CURVE_SEG = 32;
+
+// mouth of the slot; deeper (longer tines) for more pin-header rows
+const yBottomFor = (rows) => SLOT_CY - rows * TINE_LEN;
 
 // Flip the part so the forks point UP and the base rests on y = 0.
 // (180 deg about Z = proper rotation, keeps face winding, then lift by Y_TOP.)
@@ -179,32 +190,32 @@ function slotCenters(count, totalW) {
 }
 
 // Open foot: full rectangle with a bottom-open, round-topped notch per channel.
-function openFootShape(count, totalW) {
+function openFootShape(count, totalW, yBottom) {
   const s = new THREE.Shape();
   const L = -totalW / 2, R = totalW / 2;
   const cs = slotCenters(count, totalW).slice().sort((a, b) => a - b);
-  s.moveTo(L, Y_BOTTOM);
+  s.moveTo(L, yBottom);
   for (const cx of cs) {
-    s.lineTo(cx - SLOT_R, Y_BOTTOM);
+    s.lineTo(cx - SLOT_R, yBottom);
     s.lineTo(cx - SLOT_R, SLOT_CY);
     s.absarc(cx, SLOT_CY, SLOT_R, Math.PI, 0, true); // upper semicircle
-    s.lineTo(cx + SLOT_R, Y_BOTTOM);
+    s.lineTo(cx + SLOT_R, yBottom);
   }
-  s.lineTo(R, Y_BOTTOM);
+  s.lineTo(R, yBottom);
   s.lineTo(R, Y_TOP);
   s.lineTo(L, Y_TOP);
-  s.lineTo(L, Y_BOTTOM);
+  s.lineTo(L, yBottom);
   return s;
 }
 
 // Closed foot: full rectangle with a closed rounded slot (hole) sitting on a
 // floor of cap thickness -> the mouth between the fork tines is bridged.
-function closedFootShape(count, totalW, cap) {
+function closedFootShape(count, totalW, cap, yBottom) {
   const s = new THREE.Shape();
   const L = -totalW / 2, R = totalW / 2;
-  s.moveTo(L, Y_BOTTOM); s.lineTo(R, Y_BOTTOM);
-  s.lineTo(R, Y_TOP);    s.lineTo(L, Y_TOP); s.lineTo(L, Y_BOTTOM);
-  const slotBottom = Y_BOTTOM + cap;
+  s.moveTo(L, yBottom); s.lineTo(R, yBottom);
+  s.lineTo(R, Y_TOP);    s.lineTo(L, Y_TOP); s.lineTo(L, yBottom);
+  const slotBottom = yBottom + cap;
   for (const cx of slotCenters(count, totalW)) {
     const h = new THREE.Path();
     h.moveTo(cx - SLOT_R, slotBottom);
@@ -228,6 +239,7 @@ function build(p) {
   const stripW  = p.count * PITCH;
   const totalW  = stripW + (p.equal ? 2 * WALL : 0);
   const totalL  = p.span + 2 * FOOT_LEN;
+  const yBottom = yBottomFor(p.rows);
 
   // dispose old
   group.children.forEach(m => m.geometry.dispose());
@@ -243,22 +255,22 @@ function build(p) {
   // feet
   const z0 = -totalL / 2, z1 = totalL / 2 - FOOT_LEN;
   geoms.push(footGeom(
-    p.close === 'start' ? closedFootShape(p.count, totalW, p.cap) : openFootShape(p.count, totalW), z0));
+    p.close === 'start' ? closedFootShape(p.count, totalW, p.cap, yBottom) : openFootShape(p.count, totalW, yBottom), z0));
   geoms.push(footGeom(
-    p.close === 'end'   ? closedFootShape(p.count, totalW, p.cap) : openFootShape(p.count, totalW), z1));
+    p.close === 'end'   ? closedFootShape(p.count, totalW, p.cap, yBottom) : openFootShape(p.count, totalW, yBottom), z1));
 
   // flip forks-up (base on y = 0) and add
   for (const g of geoms) { g.applyMatrix4(FLIP); group.add(new THREE.Mesh(g, material)); }
 
-  updateDims(totalL, totalW, p.count);
+  updateDims(totalL, totalW, p.count, yBottom);
   return { totalW, totalL };
 }
 
-function updateDims(len, wid, count) {
+function updateDims(len, wid, count, yBottom) {
   document.getElementById('dims').innerHTML =
     `Length: <b>${len.toFixed(2)}</b> mm<br>` +
     `Width: <b>${wid.toFixed(2)}</b> mm<br>` +
-    `Height: <b>${(Y_TOP - Y_BOTTOM).toFixed(2)}</b> mm<br>` +
+    `Height: <b>${(Y_TOP - yBottom).toFixed(2)}</b> mm<br>` +
     `Channels: <b>${count}</b> · pitch <b>2.54</b> mm`;
 }
 
@@ -281,6 +293,7 @@ function readParams() {
   return {
     count: Math.max(1, parseInt(document.getElementById('countN').value) || 1),
     span:  Math.max(0.5, parseFloat(document.getElementById('spanN').value) || 0.5),
+    rows:  Math.max(1, parseInt(document.getElementById('rows').value) || 1),
     close: document.getElementById('close').value,
     cap:   Math.max(0.1, parseFloat(document.getElementById('cap').value) || 0.4),
     equal: document.getElementById('equal').checked,
@@ -301,17 +314,18 @@ function pair(rangeId, numId, onChange) {
 }
 pair('count', 'countN', () => rebuild(false));
 pair('span', 'spanN', () => rebuild(false));
-['close', 'cap', 'equal'].forEach(id =>
+['rows', 'close', 'cap', 'equal'].forEach(id =>
   document.getElementById(id).addEventListener('input', () => rebuild(false)));
 document.getElementById('fit').addEventListener('click', fitView);
 
 // ---- reset to defaults -------------------------------------------------
-const DEFAULTS = { count:4, span:17.8, close:'start', cap:0.4, equal:true };
+const DEFAULTS = { count:4, span:17.8, rows:1, close:'start', cap:0.4, equal:true };
 function resetDefaults() {
   document.getElementById('count').value  = DEFAULTS.count;
   document.getElementById('countN').value = DEFAULTS.count;
   document.getElementById('span').value   = DEFAULTS.span;
   document.getElementById('spanN').value  = DEFAULTS.span;
+  document.getElementById('rows').value   = DEFAULTS.rows;
   document.getElementById('close').value  = DEFAULTS.close;
   document.getElementById('cap').value    = DEFAULTS.cap;
   document.getElementById('equal').checked = DEFAULTS.equal;
