@@ -38,8 +38,9 @@ equal_end_tines = true;    // pad the two outer tines so they are as wide as
 
 rows      = 1;             // pin-header rows to grip: 2 makes the tines twice
                            // as deep (longer fork) for a stacked two-row header.
+offset    = 0;             // extra fork-tine length (mm) added on top of rows.
 tine_len  = slot_cy - (-2.54);            // straight tine/slot depth for one row (1.27)
-y_bottom  = slot_cy - rows * tine_len;    // open mouth of the slot; deeper for more rows
+y_bottom  = slot_cy - rows * tine_len - offset;   // deeper mouth = longer tines
 
 pitch   = 2 * half_w;      // 2.54 mm  (channel pitch)
 wall    = half_w - slot_r; // one channel side-wall = half a middle tine (0.52)
