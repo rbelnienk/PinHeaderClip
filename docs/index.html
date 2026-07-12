@@ -60,6 +60,10 @@
     padding:8px; box-shadow:0 12px 34px rgba(0,0,0,.55); }
   #tip.show { display:block; }
   #tip img { display:block; width:100%; height:auto; border-radius:6px; }
+  #tipCaption { display:none; padding:10px 4px 2px; }
+  #tipCaption.show { display:block; }
+  #tipCaption .title { color:var(--text); font-size:15px; font-weight:600; line-height:1.4; }
+  #tipCaption .sub { color:var(--muted); font-size:13px; margin-top:4px; }
   @media (max-width:760px){
     #app{ flex-direction:column-reverse; }
     #panel{ flex:1 1 auto; min-height:0; border-left:0; border-top:1px solid var(--line); }
@@ -86,8 +90,10 @@
       <div class="lbl">
         <label for="span">Length between PCB bottom and Female Pin Header Top (mm)</label>
         <span class="info" id="spanInfo" tabindex="0" role="button"
-              data-img="span-help.svg"
+              data-img="span-help.png"
               data-alt="Length is the distance from the PCB underside to the top of the female pin header"
+              data-cap-title="Length = distance from the PCB underside to the top of the female pin header"
+              data-cap-sub="Measure it on your assembled board and enter it in mm."
               aria-label="Show a diagram of what this length means">i</span>
       </div>
       <div class="row">
@@ -145,6 +151,10 @@
 
 <div id="tip" role="tooltip">
   <img id="tipImg" src="" alt="">
+  <div id="tipCaption">
+    <div class="title" id="tipCapTitle"></div>
+    <div class="sub" id="tipCapSub"></div>
+  </div>
 </div>
 
 <script type="importmap">
@@ -368,8 +378,11 @@ function resetDefaults() {
 document.getElementById('reset').addEventListener('click', resetDefaults);
 
 // ---- info tooltip (shared by every .info icon) -------------------------
-const tipEl  = document.getElementById('tip');
-const tipImg = document.getElementById('tipImg');
+const tipEl      = document.getElementById('tip');
+const tipImg     = document.getElementById('tipImg');
+const tipCap     = document.getElementById('tipCaption');
+const tipCapTitle = document.getElementById('tipCapTitle');
+const tipCapSub   = document.getElementById('tipCapSub');
 const infoEls = document.querySelectorAll('.info');
 let activeInfoEl = null;
 
@@ -378,6 +391,15 @@ function showTip(el) {
   if (tipImg.getAttribute('src') !== el.dataset.img) {
     tipImg.src = el.dataset.img;
     tipImg.alt = el.dataset.alt || '';
+  }
+  // caption text is optional per icon - some help images (like offset's)
+  // already have their caption baked into the picture
+  if (el.dataset.capTitle) {
+    tipCapTitle.textContent = el.dataset.capTitle;
+    tipCapSub.textContent = el.dataset.capSub || '';
+    tipCap.classList.add('show');
+  } else {
+    tipCap.classList.remove('show');
   }
   tipEl.classList.add('show');                 // must be visible to measure it
   const r = el.getBoundingClientRect();
